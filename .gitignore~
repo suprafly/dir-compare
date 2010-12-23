@@ -1,0 +1,6 @@
+base/
+comp/
+r.rb
+old_methods.rb
+*.txt
+.DS_Store

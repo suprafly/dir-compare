@@ -1,0 +1,150 @@
+#A little script to compare the contents of directories, in order to see what files may be missing
+
+
+#Things Left to Fix:
+
+#Turn into a CLASS with METHODS for accomplishing all of this
+
+#Make recursive calls through unlimited directory depth, OR
+#Allow user to set depth of directory search
+
+#Allow user to specify a REGEX to evaluate directory based upon
+
+
+def strip(bdr,x)
+   bdr = bdr - [".", ".."]
+   bdr.collect {|y| x + "/" + y}
+
+end
+
+B1 = ARGV[0]
+B2 = ARGV[1]
+
+bdr = Dir.entries(B1)
+cdr = Dir.entries(B2)
+
+bdr = bdr - [".", ".."]
+cdr = cdr - [".", ".."]
+
+@base_dir = Hash.new
+
+@discrep = false	#Discrepancy file setup
+@di = [File.expand_path(File.dirname(__FILE__)),"discrep.txt"].join("/")
+File.delete(@di) if File.exists?(@di)
+
+puts "Type 1 for subdirectory comparison or 2 for full directory trace:"
+mode = STDIN.gets
+
+diff=[]
+
+########### MODE ONE METHOD
+b_diff = bdr - cdr
+c_diff = cdr - bdr
+
+#### OUTPUT METHOD
+if mode.to_i == 1
+ if b_diff == [] && c_diff == []
+   puts "Identical directory structure"
+ else
+   if b_diff != []
+    puts "Present in base but not present in comparison: ", b_diff
+   else
+    puts "Present in comparison but not present in base: ", c_diff
+   end
+ end
+end
+
+
+############ MODE 2 METHOD
+if mode.to_i == 2
+	bdr.each do |x| 
+		@base_dir[x] = Dir.entries(B1+"/"+x) if File.directory? "#{B1}/#{x}"
+		@base_dir[x] = @base_dir[x] - [".", ".."] if @base_dir[x] != nil
+	end
+
+	cdr.each do |x|
+		if !@base_dir.has_key?(x)						#An element in Comp is not found in Base
+			diff.push "#{B2}/#{x}/"
+		else	
+								#Element in Comp found in Base
+			x.each do |y| 
+				c_sub = Dir.entries("#{B2}/#{x}") if File.directory? "#{B2}/#{x}"		#COMP/SUB/
+##### CLEAN UP DIR METHOD
+				c_sub = c_sub - [".", ".."] if c_sub != nil
+##### END CLEAN UP
+				b_sub = Dir.entries("#{B1}/#{x}") if File.directory? "#{B1}/#{x}"		#BASE/SUB/
+				b_sub = b_sub - [".", ".."] if b_sub != nil
+
+				if b_sub == [] and c_sub != []
+					c_sub.each do |z|  
+						diff.push "#{B2}/#{x}/#{z}"
+					end	
+				end
+
+				c_sub.each do |z|					#For each Sub directory element
+					if !b_sub.include?(z)			#Sub directory entry not present
+						diff.push "#{B2}/#{x}/#{z}"
+					else											#Sub directories Present, Check elements
+						c_sub2 = Dir.entries("#{B2}/#{x}/#{z}")	if File.directory? "#{B2}/#{x}/#{z}"	#COMP/SUB/*.*
+						b_sub2 = Dir.entries("#{B1}/#{x}/#{z}")	if File.directory? "#{B1}/#{x}/#{z}"	#BASE/SUB/*.*
+						
+						c_sub2 = c_sub2.sort if c_sub2 != nil		#Sorting the arrays if they contain anything
+						b_sub2 = b_sub2.sort if b_sub2 != nil
+
+######### DISCREP METHOD
+						if c_sub2 != b_sub2
+							diff.push "#{B2}/#{x}/#{z}"
+							@discrep = true
+							afile = File.new("/home/truck/programs/dir_comp/discrep.txt","a")
+  							if afile
+   							   afile.syswrite("\n\n#{x}/#{z}:\n\nFrom Base:\n")
+							   afile.syswrite([b_sub2-c_sub2].join("\n"))
+							   afile.syswrite("\n\nFrom Compared:\n")
+							   afile.syswrite([c_sub2-b_sub2].join("\n"))
+  							else
+   							   puts "Unable to open discrep.txt!"
+  							end
+  							afile.close
+
+						end
+					end
+
+				end #c_sub each END
+
+
+			end #@base_dir each END
+
+		end
+
+	end #cdr each END
+	diff = diff.uniq
+
+end
+
+
+### OUTPUT METHOD
+if mode.to_i == 2				#Output all results
+ puts "1 for screen output, 2 for file output: "
+ j = STDIN.gets
+
+ if diff == nil
+   puts "Directories are identical"
+ else
+
+   if j == 2
+  	puts "See output.txt for files missing"
+  	afile = File.new("/home/truck/programs/dir_comp/output.txt","w")
+  	if afile
+   	   afile.syswrite(["Missing from base directory:\n",diff.join("\n")].join)
+  	else
+   	   puts "Unable to open output.txt!"
+  	end
+  	afile.close
+   else
+   	puts ["Missing from base directory:\n",diff.join("\n")].join
+   end
+
+ end
+end
+
+puts "\nThere were discrepancies. Please see discrep.txt for more information." if @discrep
